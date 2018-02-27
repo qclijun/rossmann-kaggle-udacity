@@ -1,0 +1,6 @@
+.RData
+.Rhistory
+R.Rproj
+*.bak
+R/.Rproj.user/
+
