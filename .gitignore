@@ -3,7 +3,6 @@
 R.Rproj
 *.bak
 R/.Rproj.user/
-output/checkpt/
 *.pyc
 *.hdf5
 output/*.csv
@@ -13,6 +12,7 @@ output/*.csv
 report/
 tmp/
 output/
+!output/all_data.h5
 models/
 /embedding_features.h5
 /*.csv
