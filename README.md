@@ -56,8 +56,8 @@
 
  ---
  运行截图
- ![运行截图](./Run.png)
-![运行截图](http://github.com/qclijun/rossmann-kaggle-udacity/raw/master/Run.png)
+ ![](./Run.png)
+
  
  
 
