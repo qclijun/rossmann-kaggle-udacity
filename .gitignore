@@ -11,7 +11,7 @@ output/*.csv
 2nd/
 report/
 tmp/
-output/
+output/*
 !output/all_data.h5
 models/
 /embedding_features.h5
