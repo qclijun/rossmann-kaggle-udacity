@@ -17,6 +17,7 @@
 - keras
 - xgboost
 - lightgbm
+- h5py
 
 ## 运行
 1. 检查本项目应该包含以下子目录: googletrend, input, models, output, R, weather
