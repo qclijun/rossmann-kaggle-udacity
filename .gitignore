@@ -13,7 +13,8 @@ report/
 tmp/
 output/*
 !output/all_data.h5
-models/
+models/*
+!models/.gitkeep
 /embedding_features.h5
 /*.csv
 *.txt
