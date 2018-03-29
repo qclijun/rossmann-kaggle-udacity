@@ -9,29 +9,86 @@ import keras.backend as K
 from keras.losses import logcosh, mae, mse, mape
 import matplotlib.pyplot as plt
 
-from ross_util import mspe_keras, mape_keras, transform_y, inverse_transform_y, rmspe
+MIN_LOG_SALES = 3.8286
+#MIN_LOG_SALES = 6.3969
+MAX_LOG_SALES = 10.6347
+MEAN_LOG_SALES = 8.7576
+STD_LOG_SALES = 0.4253
+
+SCALE = 'norm' # minmax, norm
+
 
 USE_LOG_Y = True
 USE_SAMPLE_WEIGHT = False
 DISPLAY_METRIC = True
 
 EMBEDDING_DROPOUT = 0.03
-DNN_DROPOUT = 0.2
-ACTIVATION = 'relu' #relu, elu, selu, PReLu, LeakyReLu, Swish
-METRIC = 'mspe' # mape, mspe
+DNN_DROPOUT = 0.4
+ACTIVATION = 'LeakyReLu' #relu, elu, selu, PReLu, LeakyReLu, Swish
+METRIC = 'mape' # mape, mspe
 
 FEATURES_TREND = True
 FEATURES_WEATHER = True
-FEATURES_FB = True
-FEATURES_COUNT_FB = True
-FEATURES_LONGCLOSED = True
-FEATURES_SHOPAVG = True
-FEATURES_PROMODECAY = False
+FEATURES_FB = False
+FEATURES_COUNT_FB = False
+FEATURES_LONGCLOSED = False
 FEATURES_SUMMER = False
 
+def mspe(y_true, y_pred):
+    err = ((y_true - y_pred) /y_true)**2
+    err = np.mean(err, axis=-1)
+    return err
 
-MODEL_BASELINE = False
 
+def rmspe(y_true, y_pred):
+    return mspe(y_true, y_pred)**0.5
+
+def mape(y_true, y_pred):
+    err = np.abs((y_true - y_pred)/y_true)
+    err = np.mean(err, axis=-1)
+    return err
+
+def mspe_keras(y_true, y_pred):
+    if USE_LOG_Y:
+        if SCALE == 'minmax':
+            y_true = K.exp(y_true * (MAX_LOG_SALES - MIN_LOG_SALES) + MIN_LOG_SALES)
+            y_pred = K.exp(y_pred * (MAX_LOG_SALES - MIN_LOG_SALES) + MIN_LOG_SALES)
+        else:
+            y_true = K.exp(y_true * STD_LOG_SALES + MEAN_LOG_SALES)
+            y_pred = K.exp(y_pred * STD_LOG_SALES + MEAN_LOG_SALES)
+
+    diff = K.pow((y_true - y_pred) / y_true, 2)
+    return  K.mean(diff, axis=-1)
+
+def mape_keras(y_true, y_pred):
+    if USE_LOG_Y:
+        if SCALE == 'minmax':
+            y_true = K.exp(y_true * (MAX_LOG_SALES - MIN_LOG_SALES) + MIN_LOG_SALES)
+            y_pred = K.exp(y_pred * (MAX_LOG_SALES - MIN_LOG_SALES) + MIN_LOG_SALES)
+        else:
+            y_true = K.exp(y_true * STD_LOG_SALES + MEAN_LOG_SALES)
+            y_pred = K.exp(y_pred * STD_LOG_SALES + MEAN_LOG_SALES)
+    diff = K.abs((y_true - y_pred) / y_true)
+    return K.mean(diff, axis=-1)
+
+
+def transform_y(y):
+    if USE_LOG_Y:
+        if SCALE == 'minmax':
+            return (np.log(y) - MIN_LOG_SALES)/ (MAX_LOG_SALES - MIN_LOG_SALES)
+        else:
+            return (np.log(y) - MEAN_LOG_SALES) / STD_LOG_SALES
+    else:
+        return y
+
+def inverse_transform_y(transformed_y):
+    if USE_LOG_Y:
+        if SCALE == 'minmax':
+            return np.exp(transformed_y * (MAX_LOG_SALES - MIN_LOG_SALES) + MIN_LOG_SALES)
+        else:
+            return np.exp(transformed_y * STD_LOG_SALES + MEAN_LOG_SALES)
+    else:
+        return transformed_y
 
 def tukey_loss(c=4.6851):
     c1 = c**2/6
@@ -231,7 +288,8 @@ class NN_Embedding:
                         callbacks=self.callbacks,
                        initial_epoch=init_epoch)
         self.history = pd.DataFrame(hist.history)
-
+        #self.plot_history(out_file='./output/loss.png')
+        #print(hist.history)
 
     def plot_loss(self, out_file=None):
         print('plot loss curve...')
@@ -329,14 +387,14 @@ class NN_Embedding:
         embeddings.append(x)
 
         competemonths_input = Input(shape=(1,))
-        x = Embedding(25, 13, input_length=1)(competemonths_input)
-        x = Reshape(target_shape=(13,))(x)
+        x = Embedding(27, 14, input_length=1)(competemonths_input)
+        x = Reshape(target_shape=(14,))(x)
         inputs.append(competemonths_input)
         embeddings.append(x)
 
         promo2weeks_input = Input(shape=(1,))
-        x = Embedding(26, 13, input_length=1)(promo2weeks_input)
-        x = Reshape(target_shape=(13,))(x)
+        x = Embedding(28, 14, input_length=1)(promo2weeks_input)
+        x = Reshape(target_shape=(14,))(x)
         inputs.append(promo2weeks_input)
         embeddings.append(x)
 
@@ -392,6 +450,12 @@ class NN_Embedding:
         x = Embedding(53, 27, input_length=1)(woy_input)
         x = Reshape(target_shape=(27,))(x)
         inputs.append(woy_input)
+        embeddings.append(x)
+
+        days_input = Input(shape=(1,))
+        x = Embedding(990, 50, input_length=1)(days_input)
+        x = Reshape(target_shape=(50,))(x)
+        inputs.append(days_input)
         embeddings.append(x)
 
         if FEATURES_WEATHER:
@@ -499,12 +563,11 @@ class NN_Embedding:
             inputs.append(promo_count_backward_input)
             embeddings.append(x)
 
-        if FEATURES_PROMODECAY:
-            promo_decay_input = Input(shape=(1,))
-            x = Embedding(6, 3, input_length=1)(promo_decay_input)
-            x = Reshape(target_shape=(3,))(x)
-            inputs.append(promo_decay_input)
-            embeddings.append(x)
+        # promo_decay_input = Input(shape=(1,))
+        # x = Embedding(6, 3, input_length=1)(promo_decay_input)
+        # x = Reshape(target_shape=(3,))(x)
+        # inputs.append(promo_decay_input)
+        # embeddings.append(x)
 
         if FEATURES_TREND:
             googletrend_de_input = Input(shape=(1,))
@@ -518,13 +581,12 @@ class NN_Embedding:
             #x = Dense(1)(x)
             inputs.append(googletrend_state_input)
             embeddings.append(x)
-
-        if FEATURES_SHOPAVG:
-            avg_sales_input = Input(shape=(8,))
-            x = avg_sales_input
-            # x = Dense(8)(x)
-            inputs.append(avg_sales_input)
-            embeddings.append(x)
+        #
+        # avg_sales_input = Input(shape=(8,))
+        # x = avg_sales_input
+        # # x = Dense(8)(x)
+        # inputs.append(avg_sales_input)
+        # embeddings.append(x)
 
         if FEATURES_LONGCLOSED:
             before_long_closed_input = Input(shape=(1,))
@@ -566,24 +628,26 @@ class NN_Embedding:
 
         x = Concatenate()(embeddings)
 
-        if MODEL_BASELINE:
-            x = Dropout(0.02)(x)
-            x = Dense(1000, kernel_initializer='random_uniform', activation='relu')(x)
-            x = Dense(500, kernel_initializer='random_uniform', activation='relu')(x)
-            x = Dense(1, activation='sigmoid')(x)
-        else:
-            # x = Dense(250, activation='relu')(x)
-            x = Dropout(EMBEDDING_DROPOUT)(x)
-            x = residual_layer(x, 512, dropout=DNN_DROPOUT)
-            #x = residual_layer(x, 512, dropout=DNN_DROPOUT)
-            x = residual_layer(x, 256)
-            #x = residual_layer(x, 128, dropout=DNN_DROPOUT)
-            #x = Dense(100, activation='relu')(x)
-            #x = Dense(x, 100)(x)
-            if USE_LOG_Y:
+        # x = Dropout(0.02)(x)
+        # x = Dense(1000, kernel_initializer='glorot_uniform', activation='relu')(x)
+        # x = Dense(500, kernel_initializer='glorot_uniform', activation='relu')(x)
+        # x = Dense(1, activation='sigmoid')(x)
+        # x = Dense(250, activation='relu')(x)
+        x = Dropout(EMBEDDING_DROPOUT)(x)
+        x = residual_layer(x, 512, dropout=DNN_DROPOUT)
+        #x = residual_layer(x, 512, dropout=DNN_DROPOUT)
+        x = residual_layer(x, 256, dropout=DNN_DROPOUT)
+        #x = residual_layer(x, 128, dropout=DNN_DROPOUT)
+        #x = residual_layer(x, 64)
+        #x = Dense(100, activation='relu')(x)
+        #x = Dense(x, 100)(x)
+        if USE_LOG_Y:
+            if SCALE == 'minmax':
                 x = Dense(1, activation='sigmoid')(x)
             else:
                 x = Dense(1)(x)
+        else:
+            x = Dense(1)(x)
 
 
         model = keras.models.Model(inputs=inputs, outputs=[x])
@@ -595,7 +659,7 @@ class NN_Embedding:
         #loss = tukey_loss(0.5)
         #loss = huber_loss(1.0)
         # opt = keras.optimizers.SGD(lr=0.01)
-        opt = keras.optimizers.Adam(amsgrad=False)
+        opt = keras.optimizers.Adam(amsgrad=True)
         # opt = keras.optimizers.Nadam()
         if DISPLAY_METRIC:
             metrics = [mape_keras] if METRIC == 'mape' else [mspe_keras]
@@ -634,12 +698,10 @@ class NN_Embedding:
         school_holiday = X['SchoolHoliday']
         X_list.append(school_holiday)
 
-        has_competition_for_months = X['CompeteOpenMonths']
-        has_competition_for_months[has_competition_for_months < 0] = 0
+        has_competition_for_months = X['CompeteOpenMonths'] + 2
         X_list.append(has_competition_for_months)
 
-        has_promo2_for_weeks = X['Promo2OpenWeeks']
-        has_promo2_for_weeks[has_promo2_for_weeks < 0] = 0
+        has_promo2_for_weeks = X['Promo2OpenWeeks'] + 2
         X_list.append(has_promo2_for_weeks)
 
         latest_promo2_for_months = X['Latest_Promo2_Start_Month']
@@ -657,6 +719,8 @@ class NN_Embedding:
         PromoInterval = X['Promo2IntervalN']
         X_list.append(PromoInterval)
 
+
+
         CompetitionOpenSinceYear = X['CompetitionOpenSinceYear'] - 1999
         CompetitionOpenSinceYear[CompetitionOpenSinceYear < 0] = 0
         X_list.append(CompetitionOpenSinceYear)
@@ -671,6 +735,9 @@ class NN_Embedding:
         week_of_year = X['WeekOfYear'] - 1
         X_list.append(week_of_year)
 
+
+        days = X['Days']
+        X_list.append(days)
 
         if FEATURES_WEATHER:
 
@@ -690,22 +757,22 @@ class NN_Embedding:
             X_list.append(weather_event)
 
         if FEATURES_FB:
-            promo_first_forward_looking = X['Promo_Forward']
+            promo_first_forward_looking = X['Promo_Forward'] - 1
             X_list.append(promo_first_forward_looking)
 
-            promo_last_backward_looking = X['Promo_Backward']
+            promo_last_backward_looking = X['Promo_Backward'] - 1
             X_list.append(promo_last_backward_looking)
 
-            stateHoliday_first_forward_looking = X['StateHoliday_Forward']
+            stateHoliday_first_forward_looking = X['StateHoliday_Forward'] - 1
             X_list.append(stateHoliday_first_forward_looking)
 
-            stateHoliday_last_backward_looking = X['StateHoliday_Backward']
+            stateHoliday_last_backward_looking = X['StateHoliday_Backward'] - 1
             X_list.append(stateHoliday_last_backward_looking)
 
-            schoolHoliday_first_forward_looking = X['SchoolHoliday_Forward']
+            schoolHoliday_first_forward_looking = X['SchoolHoliday_Forward'] - 1
             X_list.append(schoolHoliday_first_forward_looking)
 
-            schoolHoliday_last_backward_looking = X['SchoolHoliday_Backward']
+            schoolHoliday_last_backward_looking = X['SchoolHoliday_Backward'] - 1
             X_list.append(schoolHoliday_last_backward_looking)
 
         if FEATURES_COUNT_FB:
@@ -727,9 +794,8 @@ class NN_Embedding:
             promo_count_bw = X['Promo_Count_BW']
             X_list.append(promo_count_bw)
 
-        if FEATURES_PROMODECAY:
-            promo_decay = X['PromoDecay']
-            X_list.append(promo_decay)
+        # promo_decay = X['PromoDecay']
+        # X_list.append(promo_decay)
 
         if FEATURES_TREND:
             googletrend_DE = X['Trend_Val_DE']
@@ -738,13 +804,11 @@ class NN_Embedding:
             googletrend_state = X['Trend_Val_State']
             X_list.append(googletrend_state)
 
-        if FEATURES_SHOPAVG:
-
-            avg_sales = np.concatenate((X['Sales_Per_Day'], X['Customers_Per_Day'], X['Sales_Per_Customer'],
-                                        X['Sales_Promo'], X['Sales_Holiday'], X['Sales_Saturday'],
-                                       X['Open_Ratio'], X['SchoolHoliday_Ratio']),
-                                       axis=1)
-            X_list.append(avg_sales)
+        # avg_sales = np.concatenate((X['Sales_Per_Day'], X['Customers_Per_Day'], X['Sales_Per_Customer'],
+        #                             X['Sales_Promo'], X['Sales_Holiday'], X['Sales_Saturday'],
+        #                            X['Open_Ratio'], X['SchoolHoliday_Ratio']),
+        #                            axis=1)
+        # X_list.append(avg_sales)
 
         if FEATURES_LONGCLOSED:
             before_long_closed = X['Before_Long_Closed']
@@ -769,5 +833,61 @@ class NN_Embedding:
         return self.split_features(X)
 
 
+def predict_with_models(models, X_test):
+    y_pred = np.mean([model.predict(X_test) for model in models], axis=0)
+    return y_pred
 
+
+def write_submission(models, X_test, filename):
+    print('write submission file:', filename)
+    y_pred = predict_with_models(models, X_test)
+    submit_df = pd.DataFrame({'Id': range(1, len(y_pred)+1), 'Sales': y_pred})
+    submit_df.to_csv(filename, index=False)
+
+
+def eval_ensemble_models(models, valid_set=None):
+    if valid_set is None:
+        X_val = models[0].X_valid
+        y_val = models[0].y_valid
+        if X_val is None:
+            return
+    else:
+        X_val, y_val = valid_set
+        X_val = models[0].preprocess(X_val)
+        y_val = transform_y(y_val.reshape(-1))
+
+    y_pred = predict_with_models(models, X_val)
+    y_true = inverse_transform_y(y_val)
+    err = rmspe(y_true, y_pred)
+    return err
+
+def fit_ensemble_models(models, train_set=None, valid_set=None):
+    print('model stack...')
+    if train_set is None:
+        return
+
+    X_train, y_train = train_set
+    #X_train = models[0].preprocess(X_train)
+    #y_train = transform_y(y_train.reshape(-1))
+    n_models = len(models)
+    X_train = predict_with_models(models, X_train)
+
+    if valid_set is not None:
+        X_val, y_val = valid_set
+        #X_val = models[0].preprocess(X_val)
+        #y_val = transform_y(y_val.reshape(-1))
+
+        X_val = predict_with_models(models, X_val)
+        valid_set = X_val, y_val
+
+    x = Input(shape=(1,))
+    y = Dense(1, kernel_initializer=keras.initializers.ones(), use_bias=False)(x)
+    stack_model = keras.models.Model(inputs=x, outputs=[y])
+    stack_model.compile(optimizer='adam', loss='mae')
+    stack_model.summary()
+    print('training stack model...')
+    stack_model.fit(X_train, y_train, batch_size=4096, epochs=4, validation_data=valid_set)
+    weights = stack_model.get_weights()
+    print('stack model weights:', weights)
+    return stack_model
 

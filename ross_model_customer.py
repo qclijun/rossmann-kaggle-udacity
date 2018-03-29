@@ -9,14 +9,20 @@ import keras.backend as K
 from keras.losses import logcosh, mae, mse, mape
 import matplotlib.pyplot as plt
 
-from ross_util import mspe_keras, mape_keras, transform_y, inverse_transform_y, rmspe
+from ross_util import rmspe, mspe_keras, mape_keras, transform_y, inverse_transform_y
+
+MIN_LOG_SALES = 3.8286
+MAX_LOG_SALES = 10.6347
+MEAN_LOG_SALES = 8.7576
+STD_LOG_SALES = 0.4253
+SCALE = 'minmax' # minmax, norm
 
 USE_LOG_Y = True
 USE_SAMPLE_WEIGHT = False
 DISPLAY_METRIC = True
 
-EMBEDDING_DROPOUT = 0.03
-DNN_DROPOUT = 0.2
+EMBEDDING_DROPOUT = 0.02
+DNN_DROPOUT = 0.1
 ACTIVATION = 'relu' #relu, elu, selu, PReLu, LeakyReLu, Swish
 METRIC = 'mspe' # mape, mspe
 
@@ -26,7 +32,7 @@ FEATURES_FB = True
 FEATURES_COUNT_FB = True
 FEATURES_LONGCLOSED = True
 FEATURES_SHOPAVG = True
-FEATURES_PROMODECAY = False
+FEATURES_PROMODECAY = True
 FEATURES_SUMMER = False
 
 
@@ -77,12 +83,12 @@ def residual_layer(inputs, hidden_units, dropout=0.0):
     short_cut = inputs
     x = inputs
 
-    x = Dense(hidden_units, kernel_initializer='glorot_uniform')(x)
+    x = Dense(hidden_units, kernel_initializer='glorot_uniform', kernel_regularizer=None)(x)
     x = activation_layer(x)
     if dropout > 0.0:
         x = Dropout(dropout)(x)
 
-    x = Dense(input_shape, kernel_initializer='glorot_uniform')(x)
+    x = Dense(input_shape, kernel_initializer='glorot_uniform', kernel_regularizer=None)(x)
     # if dropout > 0.0:
     #     x = Dropout(dropout)(x)
     x = Add()([short_cut, x])
@@ -201,6 +207,10 @@ class NN_Embedding:
         X_train, y_train = train_set
         self.X_train = self.preprocess(X_train)
         self.y_train = transform_y(y_train.reshape(-1))
+
+        log_customers_tr = X_train['Log_Customers']
+        self.y_train = [self.y_train, log_customers_tr]
+
         if USE_SAMPLE_WEIGHT:
             sales = y_train.reshape(-1)
             #year = self.X_train[3].reshape(-1)
@@ -221,9 +231,13 @@ class NN_Embedding:
             X_valid, y_valid = valid_set
             self.X_valid = self.preprocess(X_valid)
             self.y_valid = transform_y(y_valid.reshape(-1))
+
+            log_customers_val = X_valid['Log_Customers']
+            self.y_valid = [ self.y_valid, log_customers_val]
+
             valid_set = (self.X_valid, self.y_valid)
-            self.eval_callback = Eval_Callback((self.X_train, self.y_train))
-            self.callbacks.append(self.eval_callback)
+            # self.eval_callback = Eval_Callback((self.X_train, self.y_train))
+            # self.callbacks.append(self.eval_callback)
 
         hist = self.model.fit(self.X_train, self.y_train, sample_weight=weight,
                         batch_size=batch_size, epochs=epochs, verbose=1,
@@ -231,7 +245,8 @@ class NN_Embedding:
                         callbacks=self.callbacks,
                        initial_epoch=init_epoch)
         self.history = pd.DataFrame(hist.history)
-
+        #self.plot_history(out_file='./output/loss.png')
+        #print(hist.history)
 
     def plot_loss(self, out_file=None):
         print('plot loss curve...')
@@ -256,7 +271,10 @@ class NN_Embedding:
     def predict_raw(self, X):
         if not isinstance(X, list):
             X = self.preprocess(X)
-        return self.model.predict(X, batch_size=5120).reshape(-1)
+        y_pred = self.model.predict(X, batch_size=5120)
+        y_pred = y_pred[0]
+        #print('y_pred.shape:', y_pred.shape)
+        return y_pred.reshape(-1)
 
     def predict(self, X):
         y_pred = self.predict_raw(X)
@@ -272,7 +290,7 @@ class NN_Embedding:
     def eval(self):
         err_val = 0.0
         if self.X_valid is not None:
-            err_val = self.evaluate(self.X_valid, self.y_valid)
+            err_val = self.evaluate(self.X_valid, self.y_valid[0])
             #print('RMSPE(validation):', err_val)
         return err_val
 
@@ -329,14 +347,14 @@ class NN_Embedding:
         embeddings.append(x)
 
         competemonths_input = Input(shape=(1,))
-        x = Embedding(25, 13, input_length=1)(competemonths_input)
-        x = Reshape(target_shape=(13,))(x)
+        x = Embedding(27, 14, input_length=1)(competemonths_input)
+        x = Reshape(target_shape=(14,))(x)
         inputs.append(competemonths_input)
         embeddings.append(x)
 
         promo2weeks_input = Input(shape=(1,))
-        x = Embedding(26, 13, input_length=1)(promo2weeks_input)
-        x = Reshape(target_shape=(13,))(x)
+        x = Embedding(28, 14, input_length=1)(promo2weeks_input)
+        x = Reshape(target_shape=(14,))(x)
         inputs.append(promo2weeks_input)
         embeddings.append(x)
 
@@ -570,23 +588,30 @@ class NN_Embedding:
             x = Dropout(0.02)(x)
             x = Dense(1000, kernel_initializer='random_uniform', activation='relu')(x)
             x = Dense(500, kernel_initializer='random_uniform', activation='relu')(x)
-            x = Dense(1, activation='sigmoid')(x)
+
+
+
         else:
+            # x = Dense(1, activation='sigmoid')(x)
             # x = Dense(250, activation='relu')(x)
             x = Dropout(EMBEDDING_DROPOUT)(x)
             x = residual_layer(x, 512, dropout=DNN_DROPOUT)
             #x = residual_layer(x, 512, dropout=DNN_DROPOUT)
-            x = residual_layer(x, 256)
-            #x = residual_layer(x, 128, dropout=DNN_DROPOUT)
+            x = residual_layer(x, 256, dropout=DNN_DROPOUT)
+            x = residual_layer(x, 128, dropout=DNN_DROPOUT)
+            #x = residual_layer(x, 64)
             #x = Dense(100, activation='relu')(x)
             #x = Dense(x, 100)(x)
-            if USE_LOG_Y:
-                x = Dense(1, activation='sigmoid')(x)
-            else:
-                x = Dense(1)(x)
+        hidden_out = Dense(1, activation='relu', name='hidden_out')(x)
+        customers_out = Dense(1, activation='sigmoid', name='customers_out')(hidden_out)
+        x = Concatenate()([hidden_out, customers_out])
+        sales_out = Dense(1, activation='sigmoid', name='sales_out')(x)
 
 
-        model = keras.models.Model(inputs=inputs, outputs=[x])
+
+
+
+        model = keras.models.Model(inputs=inputs, outputs=[sales_out,customers_out])
 
         #loss = keras.losses.mape
         loss = mae
@@ -601,7 +626,7 @@ class NN_Embedding:
             metrics = [mape_keras] if METRIC == 'mape' else [mspe_keras]
         else:
             metrics = None
-        model.compile(loss=loss, optimizer=opt, metrics=metrics)
+        model.compile(loss=loss, optimizer=opt, loss_weights=[1, 0.5])
         return model
 
     def split_features(self, X):
@@ -634,12 +659,10 @@ class NN_Embedding:
         school_holiday = X['SchoolHoliday']
         X_list.append(school_holiday)
 
-        has_competition_for_months = X['CompeteOpenMonths']
-        has_competition_for_months[has_competition_for_months < 0] = 0
+        has_competition_for_months = X['CompeteOpenMonths'] + 2
         X_list.append(has_competition_for_months)
 
-        has_promo2_for_weeks = X['Promo2OpenWeeks']
-        has_promo2_for_weeks[has_promo2_for_weeks < 0] = 0
+        has_promo2_for_weeks = X['Promo2OpenWeeks'] + 2
         X_list.append(has_promo2_for_weeks)
 
         latest_promo2_for_months = X['Latest_Promo2_Start_Month']
@@ -769,5 +792,61 @@ class NN_Embedding:
         return self.split_features(X)
 
 
+def predict_with_models(models, X_test):
+    y_pred = np.mean([model.predict(X_test) for model in models], axis=0)
+    return y_pred
 
+
+def write_submission(models, X_test, filename):
+    print('write submission file:', filename)
+    y_pred = predict_with_models(models, X_test)
+    submit_df = pd.DataFrame({'Id': range(1, len(y_pred)+1), 'Sales': y_pred})
+    submit_df.to_csv(filename, index=False)
+
+
+def eval_ensemble_models(models, valid_set=None):
+    if valid_set is None:
+        X_val = models[0].X_valid
+        y_val = models[0].y_valid
+        if X_val is None:
+            return
+    else:
+        X_val, y_val = valid_set
+        X_val = models[0].preprocess(X_val)
+        y_val = transform_y(y_val.reshape(-1))
+
+    y_pred = predict_with_models(models, X_val)
+    y_true = inverse_transform_y(y_val)
+    err = rmspe(y_true, y_pred)
+    return err
+
+def fit_ensemble_models(models, train_set=None, valid_set=None):
+    print('model stack...')
+    if train_set is None:
+        return
+
+    X_train, y_train = train_set
+    #X_train = models[0].preprocess(X_train)
+    #y_train = transform_y(y_train.reshape(-1))
+    n_models = len(models)
+    X_train = predict_with_models(models, X_train)
+
+    if valid_set is not None:
+        X_val, y_val = valid_set
+        #X_val = models[0].preprocess(X_val)
+        #y_val = transform_y(y_val.reshape(-1))
+
+        X_val = predict_with_models(models, X_val)
+        valid_set = X_val, y_val
+
+    x = Input(shape=(1,))
+    y = Dense(1, kernel_initializer=keras.initializers.ones(), use_bias=False)(x)
+    stack_model = keras.models.Model(inputs=x, outputs=[y])
+    stack_model.compile(optimizer='adam', loss='mae')
+    stack_model.summary()
+    print('training stack model...')
+    stack_model.fit(X_train, y_train, batch_size=4096, epochs=4, validation_data=valid_set)
+    weights = stack_model.get_weights()
+    print('stack model weights:', weights)
+    return stack_model
 

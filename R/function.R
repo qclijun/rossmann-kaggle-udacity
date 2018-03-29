@@ -1,5 +1,7 @@
 source('library.R')
 
+past_date = as.Date('1970-1-1')
+future_date = as.Date('2100-1-1')
 
 state_abbr_name = list(
   BadenWuerttemberg = 'BW',
@@ -27,7 +29,9 @@ event_levels = c('', 'Fog-Rain', 'Fog-Snow', 'Fog-Thunderstorm',
              'Fog-Rain-Snow-Hail', 'Rain', 'Thunderstorm', 'Snow-Hail',
              'Rain-Snow-Thunderstorm', 'Snow', 'Fog-Rain-Thunderstorm')
 
-
+min_max_scaler <- function(X){
+  (X-min(X))/(max(X) - min(X))
+}
 parse_weather <- function(weather_csv_dir){
   filenames = list.files(weather_csv_dir, pattern='*.csv$')
   data = list()
@@ -42,11 +46,11 @@ parse_weather <- function(weather_csv_dir){
   
   temperature_cols = c('Max_TemperatureC', 'Mean_TemperatureC', 'Min_TemperatureC')
   data[, c(temperature_cols):=lapply(.SD, function(x){(x-10)/30}), 
-               .SDcols = temperature_cols]
-
+       .SDcols = temperature_cols]
+  
   humidity_cols = c('Max_Humidity', 'Mean_Humidity', 'Min_Humidity')
   data[, c(humidity_cols):=lapply(.SD, function(x){(x-50)/50}), 
-               .SDcols = humidity_cols]
+       .SDcols = humidity_cols]
   
   data[, Max_Wind_SpeedKm_h:=Max_Wind_SpeedKm_h/50]
   data[, Mean_Wind_SpeedKm_h:=Mean_Wind_SpeedKm_h/30]
@@ -93,106 +97,102 @@ parse_googletrend<- function(googletrend_dir){
   trend_data[, Year:=year(Date)]
   trend_data[, WeekOfYear:=week(Date)]
   
+  trend_data_missing = CJ(State=unique(trend_data$State), Year=c(2013,2014), WeekOfYear=53, Trend_Val=0)
+  trend_data = rbindlist(list(trend_data, trend_data_missing), fill=T)
+  setkey(trend_data, 'Year', 'WeekOfYear')
+  trend_data[, Trend_Val:=ifelse(Trend_Val==0, rollsum(Trend_Val, 3, na.pad=T )/2, Trend_Val), by='State']
   trend_data[, .(State, Year, WeekOfYear, Trend_Val)]
 }
 
-generate_forward_backward_information_accumulated <- function(data, window_size=14, only_zero=TRUE){
-  columns = c('Promo', 'StateHoliday', 'SchoolHoliday')
+add_bw_features <- function(time_window){
+  # Promo
+  all_data[, Tmp_Date:=cummax(ifelse(Promo!=0, Date, past_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, Promo_Backward:=as.integer(Date-Tmp_Date)]
+  all_data[Promo_Backward>time_window, Promo_Backward:=time_window]
+  # SchoolHoliday
+  all_data[, Tmp_Date:=cummax(ifelse(SchoolHoliday!=0, Date, past_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, SchoolHoliday_Backward:=as.integer(Date-Tmp_Date)]
+  all_data[SchoolHoliday_Backward>time_window, SchoolHoliday_Backward:=time_window]
   
+  # StateHoliday
+  all_data[, Tmp_Date:=cummax(ifelse(StateHolidayN!=0, Date, past_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, StateHoliday_Backward:=as.integer(Date-Tmp_Date)]
+  all_data[StateHoliday_Backward>time_window, StateHoliday_Backward:=time_window]
+  
+  all_data[, Tmp_Date:=NULL]
 }
 
-
-make_stairs1 <- function(data, sep, values){
-  n = length(data)
-  n_sep = length(sep)
-  j=1
-  result = rep(values[1], n)
-  for(i in 1:n_sep){
-    beg=j
-    while(j<=n && data[j]<sep[i]){ 
-      j=j+1
-    }
-    result[beg:(j-1)]=values[i]
-  }
-  if(j<=n){
-    result[j:n]=values[i+1]
-  }
-  result
+add_fw_features <- function(time_window){
+  # Promo
+  all_data[.N:1, Tmp_Date:=cummin(ifelse(Promo!=0, Date, future_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, Promo_Forward:=as.integer(Tmp_Date-Date)]
+  all_data[Promo_Forward>time_window, Promo_Forward:=time_window]
+  
+  # SchoolHoliday
+  all_data[.N:1, Tmp_Date:=cummin(ifelse(SchoolHoliday!=0, Date, future_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, SchoolHoliday_Forward:=as.integer(Tmp_Date-Date)]
+  all_data[SchoolHoliday_Forward>time_window, SchoolHoliday_Forward:=time_window]
+  
+  # StateHoliday
+  all_data[.N:1, Tmp_Date:=cummin(ifelse(StateHolidayN!=0, Date, future_date)), by=Store]
+  all_data[, Tmp_Date:=as.Date(Tmp_Date)]
+  all_data[, StateHoliday_Forward:=as.integer(Tmp_Date-Date)]
+  all_data[StateHoliday_Forward>time_window, StateHoliday_Forward:=time_window]
+  
+  all_data[, Tmp_Date:=NULL]
 }
 
-make_stairs2 <- function(data, sep, values){
-  n = length(data)
-  n_sep = length(sep)
-  j=1
-  result = rep(values[1], n)
-  for(i in 1:n_sep){
-    beg=j
-    
-    while(j<=n && data[j]<=sep[i]){ 
-      j=j+1
-    }
-    result[beg:(j-1)]=values[i]
-  }
-  if(j<=n){
-    result[j:n]=values[i+1]
-  }
-  result
+add_fb_features <- function(time_window=7){
+  add_bw_features(time_window)
+  add_fw_features(time_window)
 }
 
-make_stairs <- function(data, sep, values, change_on_equals=TRUE){
-  if(change_on_equals){
-    make_stairs1(data, sep, values)
-  }else{
-    make_stairs2(data, sep, values)
-  }
+add_period_count_features <- function(period=7){
+  
+  all_data[, SchoolHoliday_Count_BW:=rollsumr(SchoolHoliday, period, na.pad=T), by=Store]
+  all_data[is.na(SchoolHoliday_Count_BW), SchoolHoliday_Count_BW:=cumsum(SchoolHoliday), by=Store]
+  
+  all_data[, Is_StateHoliday:=StateHolidayN!=0]
+  all_data[, StateHoliday_Count_BW:=rollsumr(Is_StateHoliday, period, na.pad=T), by=Store]
+  all_data[is.na(StateHoliday_Count_BW), StateHoliday_Count_BW:=cumsum(Is_StateHoliday), by=Store]
+  
+  all_data[, Promo_Count_BW:=rollsumr(Promo, period, na.pad=T), by=Store]
+  all_data[is.na(Promo_Count_BW), Promo_Count_BW:=cumsum(Promo), by=Store]
+  
+  all_data[, Open_Count_BW:=rollsumr(Open, period, na.pad=T), by=Store]
+  all_data[is.na(Open_Count_BW), Open_Count_BW:=cumsum(Open), by=Store]
+  
+
+  
+  all_data[.N:1, SchoolHoliday_Count_FW:=rollsumr(SchoolHoliday, period, na.pad=T), by=Store]
+  all_data[is.na(SchoolHoliday_Count_FW), SchoolHoliday_Count_FW:=cumsum(SchoolHoliday), by=Store]
+  
+  all_data[.N:1, StateHoliday_Count_FW:=rollsumr(Is_StateHoliday, period, na.pad=T), by=Store]
+  all_data[is.na(StateHoliday_Count_FW), StateHoliday_Count_FW:=cumsum(Is_StateHoliday), by=Store]
+  
+  all_data[.N:1, Promo_Count_FW:=rollsumr(Promo, period, na.pad=T), by=Store]
+  all_data[is.na(Promo_Count_FW), Promo_Count_FW:=cumsum(Promo), by=Store]
+  
+  all_data[.N:1, Open_Count_FW:=rollsumr(Open, period, na.pad=T), by=Store]
+  all_data[is.na(Open_Count_FW), Open_Count_FW:=cumsum(Open), by=Store]
+
 }
 
-cal_forward <- function(dt, store_id, colname,  time_window=7){
-  d = dt[.(store_id), c('Date', colname), with=F]
-  dates = d$Date
-  sep_dates = d[eval(as.name(colname))!=0, Date]
-  stair_values = c(sep_dates, as.Date('2100-1-1'))
-  x=make_stairs(dates, sep_dates, stair_values)
-  x=x-dates
-  x=ifelse(x>time_window+1, time_window+1, x)
-  x
-}
-
-cal_backward <- function(dt, store_id, colname, time_window=7){
-  d = dt[.(store_id), c('Date',colname), with=F]
-  dates = d$Date
-  sep_dates = d[eval(as.name(colname))!=0, Date]
-  stair_values = c(as.Date('1970-1-1'), sep_dates)
-  x=make_stairs(dates, sep_dates, stair_values, change_on_equals = F)
-  x=dates - x
-  x=ifelse(x>time_window+1, time_window+1, x)
-  x
-}
-
-add_forward_backward_features <- function(dt, colnames, time_window=7){
-  for(store_id in 1:1115){
-    for(colname in colnames){
-      nm = ifelse(colname=='StateHoliday', 'StateHolidayN', colname)
-      x = cal_forward(dt, store_id, nm, time_window)
-      dt[.(store_id), paste0(colname, '_', 'Forward'):=x]
-      x = cal_backward(dt, store_id, nm, time_window)
-      dt[.(store_id), paste0(colname, '_', 'Backward'):=x]
-    }
-  }
-}
-
-add_stateholiday_count_fb <- function(dt, time_window=7){
-  dt[, StateHoliday_Count_Forward:=0]
-  dt[, StateHoliday_Count_Backward:=0]
-  has_holiday = dt[StateHolidayN!=0, .(Store, Date)]
-  has_holiday_stores = has_holiday$Store
-  has_holiday_dates = has_holiday$Date
-  for(i in 1:length(has_holiday_dates)){
-    d = has_holiday_dates[i]
-    store_id = has_holiday_stores[i]
-    dt[Store==store_id & Date>d & Date<=(d+7), StateHoliday_Count_Backward := StateHoliday_Count_Backward+1]
-    dt[Store==store_id & Date<d & Date>=(d-7), StateHoliday_Count_Forward := StateHoliday_Count_Forward+1]
-  }
+add_promo_decay_feature <- function(time_window=5){
+  all_data[, diff_Promo:=Promo - shift(Promo, fill=0), by=Store]
+  all_data[, PromoStartedDate:=cummax(ifelse(diff_Promo==1, Date, past_date)), by=Store]
+  all_data[, PromoStartedDate:=as.Date(PromoStartedDate)]
+  all_data[, PromoDecay:=as.integer(Date-PromoStartedDate)]
+  all_data[PromoDecay>time_window, PromoDecay:=time_window]
+  
+  all_data[, diff_Promo:=NULL]
+  all_data[, PromoStartedDate:=NULL]
+  
 }
 
 view_sales <- function(store_id, start_date = NULL, end_date = NULL){
@@ -204,34 +204,47 @@ view_sales <- function(store_id, start_date = NULL, end_date = NULL){
   }
   start_date = as.Date(start_date)
   end_date = as.Date(end_date)
-  dt = all_data[Store==store_id & Sales>0 & (Date>=start_date) & (Date<=end_date), .(Date, Sales, Delete)]
-  ggplot(dt, aes(x=Date, y=Sales, color=Delete)) + geom_line()
+  dt = all_data[Store==store_id & Sales>0 & (Date>=start_date) & (Date<=end_date), .(Date, Sales)]
+  
+  ggplot(dt, aes(x=Date, y=Sales)) + geom_line() + geom_point()
   
   #ggplot(all_data[Store==store_id & (Date>=start_date) & (Date<=end_date) & (Sales>0), .(Date, Sales)], aes(x=Date, y=Sales)) + 
   #  geom_line()
   
 }
 
-cal_avg_sales <- function(dt){
-  total_sales = dt[is.na(Id), .(Total_Sales=sum(Sales)) ,by='Store']
-  total_sales[, Open_Days:=dt[is.na(Id) & Open==1, .N, by='Store']$N]
-  total_sales[, Total_Customers:=dt[is.na(Id), sum(Customers), by='Store']$V1]
-  total_sales[, Sales_Per_Day:=Total_Sales/Open_Days]
-  total_sales[, Customers_Per_Day:=Total_Customers/Open_Days]
-  total_sales[, Sales_Per_Customer:=Sales_Per_Day/Customers_Per_Day]
+
+
+cal_shopavg <- function(){
+  dt = all_data[is.na(Id)]
+  shopavg = dt[, .(Total_Sales=sum(Sales)) ,keyby='Store']
+  shopavg[, Open_Days:=dt[Open==1, .N, keyby='Store']$N]
+  shopavg[, Total_Customers:=dt[, sum(Customers), keyby='Store']$V1]
+  shopavg[, Sales_Per_Day:=Total_Sales/Open_Days]
+  shopavg[, Customers_Per_Day:=Total_Customers/Open_Days]
+  shopavg[, Sales_Per_Customer:=Sales_Per_Day/Customers_Per_Day]
   
-  mi = min(total_sales$Sales_Per_Day)
-  ma = max(total_sales$Sales_Per_Day)
-  total_sales[, Sales_Per_Day:=(Sales_Per_Day-mi)/(ma-mi)]
+  sales_promo = dt[Promo==1, sum(Sales), keyby='Store']
+  shopavg[, Sales_Promo:=sales_promo$V1/Total_Sales]
   
-  mi = min(total_sales$Customers_Per_Day)
-  ma = max(total_sales$Customers_Per_Day)
-  total_sales[, Customers_Per_Day:=(Customers_Per_Day-mi)/(ma-mi)]
+  sales_schoolholiday = dt[SchoolHoliday==1, sum(Sales), keyby='Store']
+  shopavg[, Sales_SchoolHoliday:=sales_schoolholiday$V1/Total_Sales]
   
-  mi = min(total_sales$Sales_Per_Customer)
-  ma = max(total_sales$Sales_Per_Customer)
-  total_sales[, Sales_Per_Customer:=(Sales_Per_Customer-mi)/(ma-mi)]
-  total_sales
+  sales_holiday = dt[StateHolidayN!=0, sum(Sales), keyby='Store']
+  shopavg[, Sales_Holiday:=sales_holiday$V1/Total_Sales]
+  
+  sales_saturday = dt[DayOfWeek==6, sum(Sales), keyby='Store']
+  shopavg[, Sales_Saturday:=sales_saturday$V1/Total_Sales]
+  
+  shopavg[, Open_Ratio:=Open_Days/942]
+  schoolholiday_days = dt[SchoolHoliday==1, .N, keyby='Store']
+  shopavg[, SchoolHoliday_Ratio:=schoolholiday_days$N/942]
+  
+  shopavg = shopavg[, lapply(.SD, function(X) (X-min(X))/(max(X) - min(X))), 
+                    .SDcols=c("Sales_Per_Day", "Customers_Per_Day", "Sales_Per_Customer", "Sales_Promo", "Sales_Holiday",
+                              "Sales_Saturday", "Open_Ratio", "SchoolHoliday_Ratio")]
+  shopavg[, Store:=1:1115]
+  
 }
 
 save_dt <- function(dt, features, filename, filter_outliers=FALSE){
@@ -252,19 +265,6 @@ save_dt <- function(dt, features, filename, filter_outliers=FALSE){
   H5close()
 }
 
-lag_lead_features <- function(dt, feature_name, fill=NA, time_window=7){
-  result_dt = dt[, c('Store', 'Date', feature_name), with=F]
-  #setkey(result_dt, 'Store', 'Date')
-  
-  lag_cols = paste0(feature_name, '_Lag_', time_window:1)
-  result_dt[, (lag_cols):=shift(.SD, time_window:1, type='lag', fill=fill), by='Store', .SDcols=(feature_name) ]
-  
-  lead_cols = paste0(feature_name, '_Lead_', 1:time_window)
-  result_dt[, (lead_cols):=shift(.SD, 1:time_window, type='lead', fill=fill), by='Store', .SDcols=(feature_name)]
-  
-  result_dt[, c(lag_cols, feature_name, lead_cols), with=F]
-  
-}
 
 
 save_seq_data <- function(){
@@ -291,22 +291,49 @@ save_seq_data <- function(){
   H5close()
 }
 
-fill_record <- function(dt){
-  
-  
-  
-}
 
 
-add_promo_decay_feature <- function(dt){
-  dt[, diff_Promo:=Promo - shift(Promo, fill=0), by='Store']
-  past_date = as.Date('1970-1-1')
-  future_date = as.Date('2100-1-1')
-  dt[, PromoStartedDate:=cummax(ifelse(diff_Promo==1, Date, past_date))]
-  dt[, PromoStartedDate:=as.Date(PromoStartedDate)]
-  dt[, PromoDecay:=Date-PromoStartedDate]
-  dt[PromoDecay>4, PromoDecay:=5]
-  dt[, PromoDecay:=as.integer(PromoDecay)]
+get_mean_sales <- function(){
+  mean_sales = all_data[, .(Mean_Sales=mean(Sales), Mean_Customers=mean(Customers)), by=.(Store, Year, Month)]
+  mean_sales[, Quar_Mean_Sales:=shift(rollmean(Mean_Sales, 3, na.pad=T, align='right'),2), by=.(Store)]
+  mean_sales[, Quar_Mean_Customers:=shift(rollmean(Mean_Customers, 3, na.pad=T, align='right'),2), by=.(Store)]
+  mean_sales[is.na(Quar_Mean_Sales),Quar_Mean_Sales:=Mean_Sales]
+  mean_sales[is.na(Quar_Mean_Customers),Quar_Mean_Customers:=Mean_Customers]
+  all_data2=merge(all_data, mean_sales[, .(Store, Year, Month, Quar_Mean_Sales, Quar_Mean_Customers)],
+                  by=c('Store','Year', 'Month'), all=T)
+
+  mean_sales_by_promo = all_data[, .(Mean_Sales=mean(Sales), Mean_Customers=mean(Customers)), 
+                                 by=.(Store,Promo,Year, Month)]
+  mean_sales_by_promo[, Quar_Mean_Sales_P:=shift(rollmean(Mean_Sales, 3, na.pad=T, align='right'),2),
+                      by=.(Store, Promo)]
+  mean_sales_by_promo[, Quar_Mean_Customers_P:=shift(rollmean(Mean_Customers, 3, na.pad=T, align='right'),2),
+                      by=.(Store, Promo)]
+  mean_sales_by_promo[is.na(Quar_Mean_Sales_P),Quar_Mean_Sales_P:=Mean_Sales,by=.(Store,Promo)]
+  mean_sales_by_promo[is.na(Quar_Mean_Customers_P),Quar_Mean_Customers_P:=Mean_Customers,by=.(Store,Promo)]
+  all_data2=merge(all_data2, mean_sales_by_promo[, .(Store, Promo, Year, Month, Quar_Mean_Sales_P, Quar_Mean_Customers_P)],
+                                                 by=c('Store', 'Promo', 'Year', 'Month'), all=T)
+  
+  mean_sales_by_dayofweek = all_data[, .(Mean_Sales=mean(Sales), Mean_Customers=mean(Customers)),
+                                     by=.(Store, Year, Month, DayOfWeek)]
+  mean_sales_by_dayofweek[, Quar_Mean_Sales_DW:=shift(rollmean(Mean_Sales, 3, na.pad=T, align='right'),2),
+                      by=.(Store, DayOfWeek)]
+  mean_sales_by_dayofweek[, Quar_Mean_Customers_DW:=shift(rollmean(Mean_Customers, 3, na.pad=T, align='right'),2),
+                          by=.(Store, DayOfWeek)]
+  mean_sales_by_dayofweek[is.na(Quar_Mean_Sales_DW),Quar_Mean_Sales_DW:=Mean_Sales,by=.(Store,DayOfWeek)]
+  mean_sales_by_dayofweek[is.na(Quar_Mean_Customers_DW),Quar_Mean_Customers_DW:=Mean_Customers,by=.(Store,DayOfWeek)]  
+  all_data2=merge(all_data2, mean_sales_by_dayofweek[, .(Store, DayOfWeek, Year, Month, Quar_Mean_Sales_DW, Quar_Mean_Customers_DW)],
+                  by=c('Store', 'DayOfWeek', 'Year', 'Month'), all=T)
+  
+  features_Quar_Mean = c("Quar_Mean_Sales", "Quar_Mean_Customers", "Quar_Mean_Sales_P", "Quar_Mean_Customers_P",
+                         "Quar_Mean_Sales_DW","Quar_Mean_Customers_DW")
+  
+  all_data2[, c(features_Quar_Mean):=lapply(.SD, log1p), .SDcols=features_Quar_Mean]
+
+  scaled_mean = scaled_mean[, lapply(.SD, function(X) (X-min(X))/(max(X) - min(X)))]
+  
+  all_data2[, `:=`(c("Quar_Mean_Sales", "Quar_Mean_Customers", "Quar_Mean_Sales_P", "Quar_Mean_Customers_P",
+                     "Quar_Mean_Sales_DW","Quar_Mean_Customers_DW"),
+                   scaled_mean)]
 }
 
 
@@ -382,4 +409,53 @@ add_long_closed_features <- function(dt, closed_days_threshold=3, time_window=7)
   }
 }
 
+
+
+# add_MA_features <- function(weeks=8){
+#   all_data[, MA_Sales_W8:=rollmeanr(Sales,weeks*8,), by=Store]
+# }
+
+
+summer_holidays = fread('../input/GermanSummerHoliday.csv')
+summer_holidays[, Start_Date:=as.Date(Start_Date)]
+summer_holidays[, End_Date:=as.Date(End_Date)]
+summer_holidays[, Days:=End_Date-Start_Date+1]
+summer_holidays[, Year:=year(Start_Date)]
+summer_holidays[State=='NI', State:='HB,NI']
+
+add_summer_holiday_features <- function(){
+  for(i in 1:nrow(summer_holidays)){
+    all_data[Year==summer_holidays[i, Year] & State==summer_holidays[i, State], 
+             c('Summer_Start_Date', 'Summer_End_Date'):=list(summer_holidays[i, Start_Date], summer_holidays[i, End_Date])]
+  }
+  all_data[, Before_SummerHoliday_Start:=as.integer(Summer_Start_Date-Date)]
+  all_data[Before_SummerHoliday_Start<0, Before_SummerHoliday_Start:=0]
+  all_data[Before_SummerHoliday_Start>15, Before_SummerHoliday_Start:=15]
+  
+  all_data[, After_SummerHoliday_Start:=as.integer(Date-Summer_Start_Date)]
+  all_data[After_SummerHoliday_Start<0, After_SummerHoliday_Start:=0]
+  all_data[After_SummerHoliday_Start>15, After_SummerHoliday_Start:=15]
+  
+  all_data[, Before_SummerHoliday_End:=as.integer(Summer_End_Date-Date)]
+  all_data[Before_SummerHoliday_End<0, Before_SummerHoliday_End:=0]
+  all_data[Before_SummerHoliday_End>15, Before_SummerHoliday_End:=15]
+  
+  all_data[, After_SummerHoliday_End:=as.integer(Date-Summer_End_Date)]
+  all_data[After_SummerHoliday_End<0, After_SummerHoliday_End:=0]
+  all_data[After_SummerHoliday_End>15, After_SummerHoliday_End:=15]
+  
+  all_data[is.na(Before_SummerHoliday_Start), Before_SummerHoliday_Start:=15]
+  all_data[is.na(After_SummerHoliday_Start), After_SummerHoliday_Start:=15]
+  all_data[is.na(Before_SummerHoliday_End), Before_SummerHoliday_End:=15]
+  all_data[is.na(After_SummerHoliday_End), After_SummerHoliday_End:=15]
+  
+}
+
+sales_delta <- function(delta=4){
+  mean_log_sales = mean(log_sales)
+  std_log_sales = sd(log_sales)
+  min_bound = exp(mean_log_sales-delta* std_log_sales)
+  max_bound = exp(mean_log_sales + delta*std_log_sales)
+  all_data[(Sales>0 & Sales<min_bound) | Sales>max_bound, .N]
+}
 
