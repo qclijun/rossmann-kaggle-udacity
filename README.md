@@ -1,15 +1,15 @@
 # rossmann-kaggle-udacity
 
-
-## Ê¹ÓÃµÄÈí¼şºÍ¿â
-ÎÒµÄ²Ù×÷ÏµÍ³ÊÇWin10 64Î»×¨Òµ°æ, ÏîÄ¿ÖĞÎÒÊ¹ÓÃRÓïÑÔ½øĞĞÊı¾İÌ½Ë÷¡¢¿ÉÊÓ»¯ºÍÌØÕ÷¹¤³ÌµÈ¹¤×÷£¬RµÄ°æ±¾ÊÇx64 3.4.3¡£ĞèÒª°²×°µÄR°üÓĞ£º
+---
+## ä½¿ç”¨çš„è½¯ä»¶å’Œåº“
+æˆ‘ä½¿ç”¨çš„æ“ä½œç³»ç»Ÿæ˜¯Win10 64ä½ä¸“ä¸šç‰ˆ, é¡¹ç›®ä¸­æˆ‘ä½¿ç”¨Rè¯­è¨€è¿›è¡Œæ•°æ®æ¢ç´¢ã€å¯è§†åŒ–å’Œç‰¹å¾å·¥ç¨‹ç­‰å·¥ä½œï¼ŒRçš„ç‰ˆæœ¬æ˜¯x64 3.4.3ã€‚éœ€è¦å®‰è£…çš„RåŒ…æœ‰ï¼š
 - zoo 
 - data.table
 - rlist
 - ggplot2
 - rhdf5
 
-ÎÒÊ¹ÓÃPython3.6 ¹¹½¨Ä£ĞÍ£¬ËùÊ¹ÓÃµÄPython¿âÓĞ£º
+æˆ‘ä½¿ç”¨Python3.6 æ„å»ºæ¨¡å‹ï¼Œéœ€è¦å®‰è£…çš„Pythonåº“æœ‰ï¼š
 - numpy
 - pandas
 - matplotlib
@@ -18,49 +18,45 @@
 - xgboost
 - lightgbm
 
-## ÔËĞĞ
-1. ¼ì²é±¾ÏîÄ¿Ó¦¸Ã°üº¬ÒÔÏÂ×ÓÄ¿Â¼: googletrend, input, models, output, R, weather
-2. ÌáÈ¡ÌØÕ÷£¨Èç¹ûÖ±½ÓÊ¹ÓÃÒÑ¾­ÌáÈ¡ºÃµÄÌØÕ÷ÎÄ¼ş£¬Ôò¿ÉÒÔÊ¡ÂÔ¸Ã²½Öè£©£º 
-
-    1) ¸Ä±ä¹¤×÷Ä¿Â¼ÖÁR×ÓÄ¿Â¼
-    
-    2) ÔËĞĞ½Å±¾data.R£¬Õâ¸ö¹ı³Ì´óÔ¼Ğè»¨·Ñ3µ½5·ÖÖÓ£¬Ëü½«ÔÚoutputÄ¿Â¼ÏÂÉú³Éall_data.h5µÄÌØÕ÷ÎÄ¼ş¡£
-3. °²×°Kaggle API, ²Î¼û https://github.com/kaggle/kaggle-api
-4. ¼òµ¥XGBoostÄ£ĞÍ£º python ross_xgb.py
-5. Entity-EmbeddingÄ£ĞÍ£º
-    
-    1£© ĞŞ¸Äross_main.pyµÄÉèÖÃ
+## è¿è¡Œ
+1. æ£€æŸ¥æœ¬é¡¹ç›®åº”è¯¥åŒ…å«ä»¥ä¸‹å­ç›®å½•: googletrend, input, models, output, R, weather
+2. æå–ç‰¹å¾ï¼ˆå¦‚æœç›´æ¥ä½¿ç”¨outputç›®å½•ä¸‹çš„all_data.h5ï¼Œåˆ™å¯ä»¥çœç•¥è¯¥æ­¥éª¤ï¼‰ï¼š 
+    - æ”¹å˜å·¥ä½œç›®å½•è‡³Rå­ç›®å½•
+    - è¿è¡Œè„šæœ¬data.Rï¼Œè¿™ä¸ªè¿‡ç¨‹å¤§çº¦éœ€èŠ±è´¹3åˆ°5åˆ†é’Ÿï¼Œå®ƒå°†åœ¨outputç›®å½•ä¸‹ç”Ÿæˆåä¸ºall_data.h5çš„ç‰¹å¾æ–‡ä»¶ã€‚
+3. å®‰è£…å¹¶é…ç½®Kaggle API, å‚è§ https://github.com/kaggle/kaggle-api
+4. ç®€å•XGBoostæ¨¡å‹ï¼š ```python ross_xgb.py```
+5. Entity-Embeddingæ¨¡å‹ï¼š
+    - ä¿®æ”¹ross_main.pyçš„è®¾ç½®
     ```
     MODEL = NN_Embedding_Base
     N_NETWORKS = 1
     EPOCHS = 20
     ```
-    2£© python ross_main.py
+    - ```python ross_main.py```
 
-6. EE-ResidualÄ£ĞÍ£º
-
-    1£© ĞŞ¸Äross_main.pyµÄÉèÖÃ
+6. EE-Residualæ¨¡å‹ï¼š
+    - ä¿®æ”¹ross_main.pyçš„è®¾ç½®
     ```
     MODEL = NN_Embedding
     N_NETWORKS = 1
     EPOCHS = 25
     ```
-    2£© python ross_main.py
+    - ```python ross_main.py```
     
-7. EE-treeÄ£ĞÍ£º python ross_ee_tree.py
+7. EE-treeæ¨¡å‹ï¼š ```python ross_ee_tree.py```
  
-8. ×îÖÕÌá½»µÄÈÚºÏÄ£ĞÍ£º
-
-    1£© ĞŞ¸Äross_main.pyµÄÉèÖÃ
+8. æœ€ç»ˆæäº¤çš„èåˆæ¨¡å‹ï¼š
+    - ä¿®æ”¹ross_main.pyçš„è®¾ç½®
     ```
     MODEL = NN_Embedding
     N_NETWORKS = 10
     EPOCHS = 25
     ```
-    2£© python ross_main.py
+    - ```python ross_main.py```
 
- 
-![run.png](attachment:image.png)
+ ---
+ è¿è¡Œæˆªå›¾
+![è¿è¡Œæˆªå›¾](http://github.com/qclijun/rossmann-kaggle-udacity/raw/master/Run.png)
  
  
 
