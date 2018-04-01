@@ -10,7 +10,7 @@ from ross_data import get_dataset, get_dataset_5_9
 MODEL = NN_Embedding
 #MODEL = NN_Embedding_Base
 
-N_NETWORKS = 10
+N_NETWORKS = 1
 VALIDATION_WEEKS = 0
 DO_EVAL = VALIDATION_WEEKS > 0
 
@@ -22,7 +22,7 @@ FILT_STORES_FOR_TRAIN = True
 FILT_STORES_FOR_VALID = True
 SAVE_CHECKPT = False
 SAVE_MODEL = True
-PRINT_SUMMARY = False
+PRINT_SUMMARY = True
 SUBMIT = True
 
 saved_model_file = './models/model_1.hdf5'

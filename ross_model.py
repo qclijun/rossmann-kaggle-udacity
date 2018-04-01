@@ -317,8 +317,8 @@ class NN_Embedding:
         embeddings.append(x)
 
         stateholiday_input = Input(shape=(1,))
-        x = Embedding(4, 3, input_length=1)(stateholiday_input)
-        x = Reshape(target_shape=(3,))(x)
+        x = Embedding(4, 1, input_length=1)(stateholiday_input)
+        x = Reshape(target_shape=(1,))(x)
         inputs.append(stateholiday_input)
         embeddings.append(x)
 
@@ -335,8 +335,8 @@ class NN_Embedding:
         embeddings.append(x)
 
         promo2weeks_input = Input(shape=(1,))
-        x = Embedding(26, 13, input_length=1)(promo2weeks_input)
-        x = Reshape(target_shape=(13,))(x)
+        x = Embedding(26, 6, input_length=1)(promo2weeks_input)
+        x = Reshape(target_shape=(6,))(x)
         inputs.append(promo2weeks_input)
         embeddings.append(x)
 
@@ -528,14 +528,14 @@ class NN_Embedding:
 
         if FEATURES_LONGCLOSED:
             before_long_closed_input = Input(shape=(1,))
-            x = Embedding(6, 3, input_length=1)(before_long_closed_input)
-            x = Reshape(target_shape=(3,))(x)
+            x = Embedding(6, 1, input_length=1)(before_long_closed_input)
+            x = Reshape(target_shape=(1,))(x)
             inputs.append(before_long_closed_input)
             embeddings.append(x)
 
             after_long_closed_input = Input(shape=(1,))
-            x = Embedding(6, 3, input_length=1)(after_long_closed_input)
-            x = Reshape(target_shape=(3,))(x)
+            x = Embedding(6, 1, input_length=1)(after_long_closed_input)
+            x = Reshape(target_shape=(1,))(x)
             inputs.append(after_long_closed_input)
             embeddings.append(x)
 
