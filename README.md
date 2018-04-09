@@ -1,8 +1,8 @@
 # rossmann-kaggle-udacity
-
----
-## 使用的软件和库
-我使用的操作系统是Win10 64位专业版, 项目中我使用R语言进行数据探索、可视化和特征工程等工作，R的版本是x64 3.4.3。需要安装的R包有：
+====
+深度神经网络模型，在Kaggle Private LeaderBoard上评分~0.103, 能排到第二名。
+## Requirements
+项目中我使用R语言进行数据探索、可视化和特征工程等工作，R的版本是x64 3.4.3。需要安装的R包有：
 - zoo 
 - data.table
 - rlist
@@ -17,9 +17,8 @@
 - keras
 - xgboost
 - lightgbm
-- h5py
 
-## 运行
+## Run
 1. 检查本项目应该包含以下子目录: googletrend, input, models, output, R, weather
 2. 提取特征（如果直接使用output目录下的all_data.h5，则可以省略该步骤）： 
     - 改变工作目录至R子目录
@@ -55,9 +54,16 @@
     ```
     - ```python ross_main.py```
 
+## Result
+与 [Cheng Guo's Entity-Embedding模型](https://github.com/entron/entity‐embedding‐rossmann/tree/kaggle)对比（10模型融合）
+| Model| Parameters    |  Private Score  | Public Score|
+| --------| -----|---- |----|
+| EE-Residual                  |  443     |   0.10292    |0.09106 |
+| Cheng Guo's Entity-Embedding | 690      |   0.10583    |0.09563 |
+
  ---
- 运行截图
- ![](./Run.png)
+ 
+ ![Submission](./imgs/submission.png)
 
  
  
