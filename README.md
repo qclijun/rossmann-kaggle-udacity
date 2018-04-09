@@ -1,6 +1,6 @@
 # rossmann-kaggle-udacity
 
-====
+----
 深度神经网络模型，在Kaggle Private LeaderBoard上评分~0.103, 能排到第二名。
 
 ## Requirements
@@ -59,8 +59,9 @@
 ## Result
 
 与 [Cheng Guo's Entity-Embedding模型](https://github.com/entron/entity‐embedding‐rossmann/tree/kaggle)对比（10模型融合）
+
 | Model| Parameters    |  Private Score  | Public Score|
-| --------| -----|---- |----|
+| --------:| -----|---- |----|
 | EE-Residual                  |  443     |   0.10292    |0.09106 |
 | Cheng Guo's Entity-Embedding | 690      |   0.10583    |0.09563 |
 
