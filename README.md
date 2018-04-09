@@ -1,6 +1,8 @@
 # rossmann-kaggle-udacity
+
 ====
 深度神经网络模型，在Kaggle Private LeaderBoard上评分~0.103, 能排到第二名。
+
 ## Requirements
 项目中我使用R语言进行数据探索、可视化和特征工程等工作，R的版本是x64 3.4.3。需要安装的R包有：
 - zoo 
@@ -55,6 +57,7 @@
     - ```python ross_main.py```
 
 ## Result
+
 与 [Cheng Guo's Entity-Embedding模型](https://github.com/entron/entity‐embedding‐rossmann/tree/kaggle)对比（10模型融合）
 | Model| Parameters    |  Private Score  | Public Score|
 | --------| -----|---- |----|
