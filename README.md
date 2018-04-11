@@ -69,6 +69,8 @@
  
  ![Submission](./imgs/submission.png)
 
+
+ ![预测结果](./imgs/store77.png)
  
  
 
