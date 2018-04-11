@@ -1,7 +1,7 @@
 # rossmann-kaggle-udacity
 
 ----
-Kaggle [Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) 竞赛，我的深度神经网络模型，在Private LeaderBoard上评分~0.103, 能排到第二名。
+[Kaggle Rossmann Store Sales](https://www.kaggle.com/c/rossmann-store-sales) 竞赛，我的深度神经网络模型，在Private LeaderBoard上评分~0.103, 能排到第二名。
 
 ## Requirements
 项目中我使用R语言进行数据探索、可视化和特征工程等工作，R的版本是x64 3.4.3。需要安装的R包有：
