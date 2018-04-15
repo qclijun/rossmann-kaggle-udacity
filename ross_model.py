@@ -317,8 +317,8 @@ class NN_Embedding:
         embeddings.append(x)
 
         stateholiday_input = Input(shape=(1,))
-        x = Embedding(4, 1, input_length=1)(stateholiday_input)
-        x = Reshape(target_shape=(1,))(x)
+        x = Embedding(4, 3, input_length=1)(stateholiday_input)
+        x = Reshape(target_shape=(3,))(x)
         inputs.append(stateholiday_input)
         embeddings.append(x)
 
@@ -335,14 +335,14 @@ class NN_Embedding:
         embeddings.append(x)
 
         promo2weeks_input = Input(shape=(1,))
-        x = Embedding(26, 6, input_length=1)(promo2weeks_input)
-        x = Reshape(target_shape=(6,))(x)
+        x = Embedding(26, 13, input_length=1)(promo2weeks_input)
+        x = Reshape(target_shape=(13,))(x)
         inputs.append(promo2weeks_input)
         embeddings.append(x)
 
         lastestpromo2months_input = Input(shape=(1,))
-        x = Embedding(4, 2, input_length=1)(lastestpromo2months_input)
-        x = Reshape(target_shape=(2,))(x)
+        x = Embedding(4, 3, input_length=1)(lastestpromo2months_input)
+        x = Reshape(target_shape=(3,))(x)
         inputs.append(lastestpromo2months_input)
         embeddings.append(x)
 
@@ -365,8 +365,8 @@ class NN_Embedding:
         embeddings.append(x)
 
         promointerval_input = Input(shape=(1,))
-        x = Embedding(4, 3, input_length=1)(promointerval_input)
-        x = Reshape(target_shape=(3,))(x)
+        x = Embedding(4, 2, input_length=1)(promointerval_input)
+        x = Reshape(target_shape=(2,))(x)
         inputs.append(promointerval_input)
         embeddings.append(x)
 
@@ -528,14 +528,14 @@ class NN_Embedding:
 
         if FEATURES_LONGCLOSED:
             before_long_closed_input = Input(shape=(1,))
-            x = Embedding(6, 1, input_length=1)(before_long_closed_input)
-            x = Reshape(target_shape=(1,))(x)
+            x = Embedding(8, 3, input_length=1)(before_long_closed_input)
+            x = Reshape(target_shape=(3,))(x)
             inputs.append(before_long_closed_input)
             embeddings.append(x)
 
             after_long_closed_input = Input(shape=(1,))
-            x = Embedding(6, 1, input_length=1)(after_long_closed_input)
-            x = Reshape(target_shape=(1,))(x)
+            x = Embedding(8, 3, input_length=1)(after_long_closed_input)
+            x = Reshape(target_shape=(3,))(x)
             inputs.append(after_long_closed_input)
             embeddings.append(x)
 
@@ -642,7 +642,7 @@ class NN_Embedding:
         has_promo2_for_weeks[has_promo2_for_weeks < 0] = 0
         X_list.append(has_promo2_for_weeks)
 
-        latest_promo2_for_months = X['Latest_Promo2_Start_Month']
+        latest_promo2_for_months = X['Latest_Promo2_Month']
         X_list.append(latest_promo2_for_months)
 
         log_distance = X['CompetitionDistance']

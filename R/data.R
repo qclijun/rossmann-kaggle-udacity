@@ -183,7 +183,7 @@ all_data[, Log_Customers:=log(Customers)/8.908]
 features = c('Id',
              'Store', 'DayOfWeek', 'Promo', 'Year', 'Month',
              'Day', 'WeekOfYear', 'DayOfYear', 'StateHolidayN', 'SchoolHoliday', 'CompeteOpenMonths', 'Promo2OpenWeeks',
-             'Latest_Promo2_Start_Month', 'CompetitionDistance', 'StoreTypeN', 'AssortmentN', 'Promo2IntervalN',
+             'Latest_Promo2_Month', 'CompetitionDistance', 'StoreTypeN', 'AssortmentN', 'Promo2IntervalN',
              'CompetitionOpenSinceYear', 'CompetitionOpenSinceMonth', 'Promo2SinceYear', 'Promo2SinceWeek',
              'StateN','Trend_Val_DE', 'Trend_Val_State',
              'PromoDecay', 'TomorrowClosed',

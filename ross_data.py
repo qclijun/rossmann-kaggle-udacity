@@ -92,7 +92,7 @@ def filter_sales_sigma(data_set, sigma=4):
 
 
 def get_dataset_5_9():
-    ### split dataset from May to Sep
+    ### split dataset May to Sep
 
     train, test = load_data()
     stores_in_test = set(get_stores_in_test(test))
